@@ -4,7 +4,9 @@ const { isDuplicate } = require('../lib/storage/idempotency');
 function verifySecret(req) {
   const expected = process.env.MAX_WEBHOOK_SECRET;
   if (!expected) return true;
-  const received = req.headers['x-max-bot-api-secret'];
+  const received =
+    req.headers['x-max-bot-api-secret'] ||
+    req.headers['X-Max-Bot-Api-Secret'];
   return received === expected;
 }
 
@@ -14,6 +16,7 @@ module.exports = async function handler(req, res) {
       ok: true,
       service: 'max-tts-bot',
       version: '2.0.0',
+      hint: 'POST сюда шлёт MAX; подписка: POST platform-api.max.ru/subscriptions',
     });
   }
 
@@ -22,24 +25,29 @@ module.exports = async function handler(req, res) {
   }
 
   if (!verifySecret(req)) {
+    console.error('[webhook] 401: неверный X-Max-Bot-Api-Secret (сверьте с подпиской MAX)');
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
   const update = req.body;
   if (!update?.update_type) {
+    console.error('[webhook] 400: нет update_type, body keys:', Object.keys(update || {}));
     return res.status(400).json({ error: 'Invalid update' });
   }
 
-  // Respond immediately — MAX retries slow endpoints
-  res.status(200).json({ ok: true });
+  console.log('[webhook]', update.update_type);
 
   try {
     if (await isDuplicate(update)) {
-      console.log('[webhook] duplicate skipped:', update.update_type);
-      return;
+      console.log('[webhook] duplicate skipped');
+      return res.status(200).json({ ok: true, duplicate: true });
     }
+
+    // Важно: на Vercel после res.json() функция часто обрывается — сначала обрабатываем
     await routeUpdateSafe(update);
+    return res.status(200).json({ ok: true });
   } catch (err) {
     console.error('[webhook]', err);
+    return res.status(200).json({ ok: true, error: 'handler_failed' });
   }
 };
