@@ -1,5 +1,5 @@
 const { routeUpdateSafe } = require('../lib/router');
-const { isDuplicate } = require('../lib/storage/idempotency');
+const { wasProcessed, markProcessed } = require('../lib/storage/idempotency');
 
 function verifySecret(req) {
   const expected = process.env.MAX_WEBHOOK_SECRET;
@@ -38,13 +38,13 @@ module.exports = async function handler(req, res) {
   console.log('[webhook]', update.update_type);
 
   try {
-    if (await isDuplicate(update)) {
+    if (await wasProcessed(update)) {
       console.log('[webhook] duplicate skipped');
       return res.status(200).json({ ok: true, duplicate: true });
     }
 
-    // Важно: на Vercel после res.json() функция часто обрывается — сначала обрабатываем
     await routeUpdateSafe(update);
+    await markProcessed(update);
     return res.status(200).json({ ok: true });
   } catch (err) {
     console.error('[webhook]', err);
