@@ -2,14 +2,18 @@
   "functions": {
     "api/webhook.js": {
       "memory": 512,
-      "maxDuration": 30
+      "maxDuration": 60
     },
     "api/health.js": {
       "maxDuration": 5
+    },
+    "api/audio.js": {
+      "maxDuration": 10
     }
   },
   "rewrites": [
     { "source": "/api/webhook", "destination": "/api/webhook.js" },
-    { "source": "/api/health", "destination": "/api/health.js" }
+    { "source": "/api/health", "destination": "/api/health.js" },
+    { "source": "/api/audio", "destination": "/api/audio.js" }
   ]
 }
